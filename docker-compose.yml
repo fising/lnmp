@@ -22,7 +22,7 @@ services:
     build:
       context: ./php
       dockerfile: Dockerfile
-    image: dev-php:8.2-alpine
+    image: dev-php:8.2
     container_name: dev-php
     restart: unless-stopped
     volumes:

@@ -1,28 +1,29 @@
-FROM php:8.2-fpm-alpine
+FROM php:8.2-fpm
 
 LABEL maintainer="dev"
 
-# 系统依赖
-RUN apk add --no-cache \
-        $PHPIZE_DEPS \
-        freetype-dev \
-        libjpeg-turbo-dev \
+# ========== 系统依赖 ==========
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        # 编译工具
+        libfreetype6-dev \
+        libjpeg62-turbo-dev \
         libpng-dev \
         libwebp-dev \
         libzip-dev \
-        icu-dev \
-        oniguruma-dev \
+        libicu-dev \
+        libonig-dev \
         libxml2-dev \
-        linux-headers \
+        # OCI8 依赖
+        libaio1t64 \
+        libaio-dev \
+        # 常用工具
         unzip \
         git \
         curl \
-    # GD 配置
     && docker-php-ext-configure gd \
         --with-freetype \
         --with-jpeg \
         --with-webp \
-    # 编译安装 PHP 扩展
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
         mysqli \
@@ -34,31 +35,30 @@ RUN apk add --no-cache \
         opcache \
         soap \
         exif \
-    # PECL 扩展
     && pecl install redis \
     && docker-php-ext-enable redis \
-    # 安装运行时依赖库，然后清理 -dev 包
-    && apk add --no-cache \
-        freetype \
-        libjpeg-turbo \
-        libpng \
-        libwebp \
-        libzip \
-        icu \
-        oniguruma \
-        libxml2 \
-    && apk del \
-        freetype-dev \
-        libjpeg-turbo-dev \
-        libpng-dev \
-        libwebp-dev \
-        libzip-dev \
-        icu-dev \
-        oniguruma-dev \
-        libxml2-dev \
-        linux-headers
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Composer
+# ========== Oracle Instant Client + OCI8 ==========
+RUN mkdir -p /opt/oracle \
+    && cd /opt/oracle \
+    && curl -sSL -o basic.zip \
+        "https://download.oracle.com/otn_software/linux/instantclient/2115000/instantclient-basic-linux.x64-21.15.0.0.0dbru.zip" \
+    && curl -sSL -o sdk.zip \
+        "https://download.oracle.com/otn_software/linux/instantclient/2115000/instantclient-sdk-linux.x64-21.15.0.0.0dbru.zip" \
+    && unzip -q basic.zip \
+    && unzip -q sdk.zip \
+    && rm basic.zip sdk.zip \
+    && mv instantclient_* instantclient \
+    && ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1 \
+    && echo /opt/oracle/instantclient > /etc/ld.so.conf.d/oracle.conf \
+    && ldconfig \
+    && docker-php-ext-configure oci8 --with-oci8=instantclient,/opt/oracle/instantclient \
+    && docker-php-ext-install -j$(nproc) oci8 \
+    && rm -rf /opt/oracle/instantclient/sdk
+
+# ========== Composer ==========
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 WORKDIR /var/www/html
