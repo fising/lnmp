@@ -1,0 +1,117 @@
+services:
+  # ========== Nginx 最新稳定版 ==========
+  nginx:
+    image: nginx:stable-alpine
+    container_name: dev-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./www:/var/www/html:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - dev-net
+    depends_on:
+      php:
+        condition: service_started
+
+  # ========== PHP-FPM 8.2 ==========
+  php:
+    build:
+      context: ./php
+      dockerfile: Dockerfile
+    image: dev-php:8.2-alpine
+    container_name: dev-php
+    restart: unless-stopped
+    volumes:
+      - ./www:/var/www/html
+      - ./php/php.ini:/usr/local/etc/php/conf.d/custom.ini:ro
+    networks:
+      - dev-net
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      TZ: "${TZ:-Asia/Shanghai}"
+
+  # ========== MySQL 5.7 ==========
+  mysql:
+    image: mysql:5.7
+    container_name: dev-mysql
+    restart: unless-stopped
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - dev-net
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-dev}
+      MYSQL_USER: ${MYSQL_USER:-dev}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-dev123}
+      TZ: "${TZ:-Asia/Shanghai}"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ========== phpMyAdmin ==========
+  phpmyadmin:
+    image: phpmyadmin:5.2-apache
+    container_name: dev-phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "${PMA_PORT:-8080}:80"
+    networks:
+      - dev-net
+    environment:
+      PMA_HOST: mysql
+      PMA_PORT: 3306
+      PMA_USER: ${MYSQL_USER:-dev}
+      PMA_PASSWORD: ${MYSQL_PASSWORD:-dev123}
+      UPLOAD_LIMIT: 128M
+      TZ: "${TZ:-Asia/Shanghai}"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  # ========== Redis 最新版 ==========
+  redis:
+    image: redis:7-alpine
+    container_name: dev-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - dev-net
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  mysql_data:
+  redis_data:
+  nginx_logs:
+
+networks:
+  dev-net:
+    driver: bridge
