@@ -1,10 +1,9 @@
-FROM php:7.4-fpm
+FROM php:7.4-fpm-bullseye
 
 LABEL maintainer="dev"
 
 # ========== 系统依赖 ==========
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        # 编译工具
         libfreetype6-dev \
         libjpeg62-turbo-dev \
         libpng-dev \
@@ -13,18 +12,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libicu-dev \
         libonig-dev \
         libxml2-dev \
-        # OCI8 依赖
         libaio1 \
         libaio-dev \
-        # 常用工具
         unzip \
         git \
         curl \
     && docker-php-ext-configure gd \
-        --with-freetype-dir \
-        --with-jpeg-dir \
-        --with-webp-dir \
-        --with-png-dir \
+        --with-freetype \
+        --with-jpeg \
+        --with-webp \
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
         mysqli \
