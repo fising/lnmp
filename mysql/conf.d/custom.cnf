@@ -19,3 +19,6 @@ innodb_flush_log_at_trx_commit = 2
 slow_query_log = 1
 slow_query_log_file = /var/lib/mysql/mysql-slow.log
 long_query_time = 2
+
+# 关闭严格模式
+sql_mode = NO_ENGINE_SUBSTITUTION
