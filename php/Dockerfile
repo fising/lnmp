@@ -1,4 +1,4 @@
-FROM php:8.2-fpm
+FROM php:7.4-fpm
 
 LABEL maintainer="dev"
 
@@ -14,16 +14,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libonig-dev \
         libxml2-dev \
         # OCI8 依赖
-        libaio1t64 \
+        libaio1 \
         libaio-dev \
         # 常用工具
         unzip \
         git \
         curl \
     && docker-php-ext-configure gd \
-        --with-freetype \
-        --with-jpeg \
-        --with-webp \
+        --with-freetype-dir \
+        --with-jpeg-dir \
+        --with-webp-dir \
+        --with-png-dir \
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
         mysqli \
@@ -51,7 +52,6 @@ RUN mkdir -p /opt/oracle \
     && unzip -q sdk.zip \
     && rm basic.zip sdk.zip \
     && mv instantclient_* instantclient \
-    && ln -s /usr/lib/x86_64-linux-gnu/libaio.so.1t64 /usr/lib/x86_64-linux-gnu/libaio.so.1 \
     && echo /opt/oracle/instantclient > /etc/ld.so.conf.d/oracle.conf \
     && ldconfig \
     && docker-php-ext-configure oci8 --with-oci8=instantclient,/opt/oracle/instantclient \
